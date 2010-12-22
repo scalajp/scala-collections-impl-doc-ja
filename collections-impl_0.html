@@ -1,30 +1,28 @@
-﻿<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
-   "DTD/xhtml1-transitional.dtd">
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
+<meta name="generator" content="HTML Tidy for Mac OS X (vers 25 March 2009), see www.w3.org" />
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 <title>Scala コレクションのアーキテクチャ</title>
 <link rel="stylesheet" type="text/css" href="guide.css" />
 </head>
 <body dir="ltr">
 <blockquote class="transnote">
-<p>Martin Odersky さんと Lex Spoon さんの "<a href=
-"http://www.scala-lang.org/docu/files/collections-api/collections-impl.html">The 
-Architecture of Scala Collections</a>" を EPFL Scala Team の許可を得て翻訳しています。<br />
-<a href="http://eed3si9n.com/">eed3si9n</a> による非公式翻訳 (user-contributed work) なので、EPFL は一切関知しません。
-翻訳の間違い等があれば遠慮なく <a href=
-"https://github.com/eed3si9n/scala-collections-impl-doc-ja/issues">Issues</a>
-などで訳者の方にご指摘ください。</p>
+<p>Martin Odersky さんと Lex Spoon さんの "<a href="http://www.scala-lang.org/docu/files/collections-api/collections-impl.html">The Architecture of Scala Collections</a>" を EPFL Scala Team の許可を得て翻訳しています。<br />
+<a href="http://eed3si9n.com/">eed3si9n</a> による非公式翻訳 (user-contributed work) なので、EPFL は一切関知しません。 翻訳の間違い等があれば遠慮なく <a href="https://github.com/eed3si9n/scala-collections-impl-doc-ja/issues">Issues</a> などで訳者の方にご指摘ください。</p>
 </blockquote>
-
 <h1 class="maketitle">Scala コレクションのアーキテクチャ</h1>
-<h2 class="maketitle">Martin Odersky, Lex Spoon</h2> <h3 class="maketitle">2010年12月15日</h3> <p>このガイドは Scala コレクションフレームワークのアーキテクチャを詳細に説明する。<a href="http://www.artima.com/scalazine/articles/scala_collections.html">Scala 2.8 コレクション API</a> と比べ、より内部の仕組みについて詳しくなっている。また、このアーキテクチャを使えば、コレクションの機能の大部分をフレームワークから再利用して独自のコレクションを数行で定義できることが分かるだろう。<p><a href="http://www.scala-lang.org/docu/files/collections-api/collections.html">Scala 2.8 コレクション API</a> には多くの異なるコレクションに一貫して定義される多くのコレクション演算がある。全てのコレクション型に対して毎回全てのコレクション演算を新しく実装してたのでは、どこからコピーされたコードが大量生産されてしまう。そのような重複コードは時を経るにつれ、コレクションライブラリの一部にだけ演算が追加されたり変更されたりして一貫性を失っていく。新たなコレクションフレームワークの第一の設計目標は一切の重複を廃し、全ての演算を限りなく少ない場所で定義することだった。（理想的には全ての演算があった一ヶ所だけで定義できればよかったのだが、再定義が必要だった例外もいくつかあった。）多くの演算をコレクションの「テンプレート」で実装して、個々の親クラスや実装クラスではそれを柔軟に継承するという設計方針を取った。以下のページにおいて、フレームワークの「パーツ」を構成するテンプレートやその他のクラスやトレイト、そしてそれらの設計方針を説明する。
-
-<p>続いては、
+<h2 class="maketitle">Martin Odersky, Lex Spoon</h2>
+<h3 class="maketitle">2010年12月15日</h3>
+<p>このガイドは Scala コレクションフレームワークのアーキテクチャを詳細に説明する。<a href="http://www.artima.com/scalazine/articles/scala_collections.html">Scala 2.8 コレクション API</a> と比べ、より内部の仕組みについて詳しくなっている。また、このアーキテクチャを使えば、コレクションの機能の大部分をフレームワークから再利用して独自のコレクションを数行で定義できることが分かるだろう。</p>
+<p><a href="http://www.scala-lang.org/docu/files/collections-api/collections.html">Scala 2.8 コレクション API</a>
+には多くの異なるコレクションに一貫して定義される多くのコレクション演算がある。全てのコレクション型に対して毎回全てのコレクション演算を新しく実装してたのでは、どこからコピーされたコードが大量生産されてしまう。そのような重複コードは時を経るにつれ、コレクションライブラリの一部にだけ演算が追加されたり変更されたりして一貫性を失っていく。新たなコレクションフレームワークの第一の設計目標は一切の重複を廃し、全ての演算を限りなく少ない場所で定義することだった。（理想的には全ての演算があった一ヶ所だけで定義できればよかったのだが、再定義が必要だった例外もいくつかあった。）多くの演算をコレクションの「テンプレート」で実装して、個々の親クラスや実装クラスではそれを柔軟に継承するという設計方針を取った。以下のページにおいて、フレームワークの「パーツ」を構成するテンプレートやその他のクラスやトレイト、そしてそれらの設計方針を説明する。</p>
+<p>続いては、</p>
 <ul class="toc">
 <li><a href="collections-impl_1.html">ビルダ</a></li>
-<li><a href="collections-impl_2.html">共通演算の摘出</a></li>
+<li><a href="collections-impl_2.html">共通する演算の摘出</a></li>
 <li><a href="collections-impl_3.html">新しいコレクションへの統合</a></li>
 <li><a href="collections-impl_4.html"><tt>RNA</tt> メソッドの戻り値型の適応</a></li>
 <li><a href="collections-impl_5.html"><tt>map</tt> 類の取り扱い</a></li>
@@ -34,7 +32,6 @@ Architecture of Scala Collections</a>" を EPFL Scala Team の許可を得て翻
 <li><a href="collections-impl_9.html">脚注</a></li>
 <li><a href="collections-impl_toc.html">ナビゲーション</a></li>
 </ul>
- <hr> 
- </body>
- </html>
- 
+<hr />
+</body>
+</html>

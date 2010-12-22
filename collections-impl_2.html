@@ -1,0 +1,392 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content="HTML Tidy for Mac OS X (vers 25 March 2009), see www.w3.org" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Scala コレクションのアーキテクチャ -- 共通する演算の摘出</title>
+<link rel="stylesheet" type="text/css" href="guide.css" />
+</head>
+<body dir="ltr">
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_1.html"><img border="0" alt="ビルダ" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b>共通する演算の摘出</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+<h1>共通演算の摘出</h1>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">package</font>&nbsp;scala.collection</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">class</font>&nbsp;<font color="#660099">TraversableLike[+Elem, +Repr]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;newBuilder:&nbsp;<font color="#660099">Builder[Elem, Repr]</font>&nbsp;<i>//&nbsp;後述する</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;foreach[U](f:&nbsp;<font color="#660099">Elem</font>&nbsp;=&gt;&nbsp;U)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>//&nbsp;後述する</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;...</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;filter(p:&nbsp;<font color="#660099">Elem</font>&nbsp;=&gt;&nbsp;<font color="#660099">Boolean</font>):&nbsp;<font color="#660099">Repr</font>&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;b&nbsp;=&nbsp;newBuilder</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;foreach&nbsp;{&nbsp;elem&nbsp;=&gt;&nbsp;<font color="#0000E5">if</font>&nbsp;(p(elem))&nbsp;b&nbsp;+=&nbsp;elem&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b.result</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;}&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center"><tt>TraversableLike</tt> における <tt>filter</tt> の実装</div>
+<p>コレクションライブラリ再設計の主な設計目標は自然な型と実装コード共有の最大化を同時に実現することだった。特に、Scala のコレクションは「戻り値同型」の原則 ("same-result-type" principle) を採用しており、コレクションの変換メソッドは、できる限り同じ型のコレクションを返すようにしている。例えば、<tt>filter</tt> 演算は全てのコレクション型において、同じコレクション型のインスタンスを返すべきだ。<tt>List</tt> に <tt>filter</tt> を適用すれば <tt>List</tt> を返すし、<tt>Map</tt> は <tt>Map</tt> を返す、という具合だ。これから、これがどう実現されているのかを見てみようと思う。</p>
+<p>Scala コレクションライブラリは、いわゆる<em>実装トレイト</em> (implementation trait) を用いてジェネリックなビルダとコレクションの探索を実装することで、コードの重複と「戻り値同型」原則を実現している。<a name="id1" id="id1">これら</a>のトレイトは語尾に <tt>Like</tt> が付くように命名されており、例えば、 <tt>IndexedSeqLike</tt> は <tt>IndexedSeq</tt> の実装トレイトであり、同様に <tt>TraversableLike</tt> は <tt>Traversable</tt> の実装トレイトだ。<tt>Traversable</tt> や <tt>IndexedSeq</tt> のような<a name="id3" id="id3">コレクション</a>クラスはこれらのトレイトから全ての具象メソッド (concrete method)
+の実装を継承している。普通のコレクションには一つの型パラメータがあるが、実装トレイトには二つの型パラメータがある。実装トレイトはコレクションの要素型についてパラメータ化するだけではなく、コレクションの<em>表現型</em> (representation type)、つまり <tt>Seq[I]</tt> や <tt>List[T]</tt> のような実際のコレクションの型そのものをパラメータ化する。例えば、ここに <tt>TraversableLike</tt> トレイトのヘッダを示す:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">trait</font>&nbsp;<font color="#660099">TraversableLike[+Elem, +Repr]</font>&nbsp;{&nbsp;...&nbsp;</tt><tt>}&nbsp;</tt></td>
+</tr>
+</table>
+</div>
+<p>型パラメータの <tt>Elem</tt> は Traversable の要素型 (element type) を表し、型パラメータの <tt>Repr</tt> はその表現 (representation) を表す。<tt>Repr</tt> には制限が無い。特に、<tt>Repr</tt> は <tt>Traversable</tt> の子クラスではない型にインスタンス化される可能性がある。これにより、コレクション階層の外部にある <tt>String</tt> や <tt>Array</tt> もコレクションの実装トレイトにある全ての演算を利用することができる。</p>
+<p><tt>filter</tt> を例にとると、この演算は <tt>TraversableLike</tt> トレイト内で一度だけ全てのコレクションに対して実装されている。大まかなコードの概要は上記の <a href="collections-impl_2.html"><tt>TraversableLike</tt> クラスの概要</a>にて示されている。このトレイトは、後に具象コレクションクラスで実装される <tt>newBuilder</tt> と <tt>foreach</tt> という二つの抽象メソッドを宣言する。<tt>filter</tt> 演算は、これらのメソッドを使って全てのコレクションに対して同様に実装されている。まず、<tt>newBuilder</tt> を用いて表現型 <tt>Repr</tt> の新しいビルダが構築される。次に、<tt>foreach</tt> を用いて現コレクション内の全ての要素が探索される。要素 <tt>x</tt> が与えられた条件関数 <tt>p</tt> を満たせば（つまり、<tt>p(x)</tt> が
+<tt>true</tt> を返せば）、その要素はビルダに追加される。最後に、ビルダの <tt>result</tt> メソッドを呼び出すことで、ビルダの中に収集された要素は <tt>Repr</tt> コレクション型のインスタンスとして返される。</p>
+<p>コレクションの <tt>map</tt> 演算はもう少し複雑だ。 例えば、<tt>f</tt> が <tt>String</tt> から <tt>Int</tt> への関数で、<tt>xs</tt> が <tt>List[String]</tt> だとすると、<tt>xs</tt>&nbsp;<tt>map</tt>&nbsp;<tt>f</tt> は <tt>List[Int]</tt> を返さなくてはならない。同様に、<tt>ys</tt> が <tt>Array[String]</tt> ならば、<tt>ys</tt>&nbsp;<tt>map</tt>&nbsp;<tt>f</tt> は <tt>Array[Int]</tt> を返さなくてはならない。問題は、<tt>map</tt> メソッドの定義をリストと配列で重複させずに、どうこれを実現させるかということだ。<a href="collections-impl_2.html"><tt>TraversableLike</tt> クラスの例</a>で見た
+<tt>newBuilder</tt>/<tt>foreach</tt> フレームワークは、コレクションと同じ<em>型</em>の新しいインスタンスしか生成できないため不十分だ。<tt>map</tt> は、<em>型コンストラクタ</em> (type constructor) は同じでもでも、要素型が異なりうるコレクションの新しいインスタンスが必要になるからだ。</p>
+<p>さらに、<tt>map</tt> のような関数の戻り値は、型コンストラクタさえも自明でない形で他の引数の型に依存する可能性がある。以下に具体例で説明する:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">import</font>&nbsp;collection.immutable.</tt><tt>BitSet</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">import&nbsp;collection.immutable.</font></tt><tt><font color="#590000">BitSet</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;bits&nbsp;=&nbsp;<font color="#660099">BitSet</font>(<font color="#000000">1</font>,&nbsp;<font color="#000000">2</font>,&nbsp;<font color="#000000">3</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">bits:&nbsp;scala.collection.immutable.</font></tt><tt><font color="#590000">BitSet&nbsp;=&nbsp;BitSet(1,&nbsp;2,&nbsp;3)</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;bits&nbsp;map&nbsp;(_&nbsp;*&nbsp;<font color="#000000">2</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res13:&nbsp;scala.collection.immutable.</font></tt><tt><font color="#590000">BitSet&nbsp;=&nbsp;BitSet(2,&nbsp;4,&nbsp;6)</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;bits&nbsp;map&nbsp;(_.toFloat)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res14:&nbsp;scala.collection.immutable.</font></tt><tt><font color="#590000">Set[Float]</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">&nbsp;&nbsp;=&nbsp;Set(1.0,&nbsp;2.0,&nbsp;3.0)</font></tt></td>
+</tr>
+</table>
+</div>
+<p>あるビット集合について二倍にする関数 <tt>_</tt>&nbsp;<tt>*</tt>&nbsp;<tt>2</tt> を <tt>map</tt> すると、もう一つのビット集合が得られる。しかし、同じビット集合について関数 <tt>(_.toFloat)</tt> を map すると、戻り値は一般集合の <tt>Set[Float]</tt> となる。もちろん、ビット集合は <tt>Float</tt> でなく <tt>Int</tt> を含むため、ビット集合ではありえない。</p>
+<p><tt>map</tt> の戻り値の形が渡された関数の形に依存することに注意してほしい。関数引数の戻り値が再び <tt>Int</tt> である場合は <tt>map</tt> 戻り値の形も <tt>BitSet</tt> だが、関数引数の型がそれ以外の場合は <tt>map</tt> の戻り値の型はただの <tt>Set</tt> となる。このような型の柔軟性が Scala でどのように実現されているのかを見てみよう。</p>
+<p>この <tt>BitSet</tt> の問題は単発のものではない。ここに、マップに対して関数を map するインタプリタとのやりとりによる具体例を二つ示す:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#660099">Map</font>(<font color="#000000">"a"</font>&nbsp;-&gt;&nbsp;<font color="#000000">1</font>,&nbsp;<font color="#000000">"b"</font>&nbsp;-&gt;&nbsp;<font color="#000000">2</font>)&nbsp;map&nbsp;{&nbsp;<font color="#0000E5">case</font>&nbsp;(x,&nbsp;y)&nbsp;=&gt;&nbsp;(y,&nbsp;x)&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>res3:&nbsp;<font color="#660099">scala.collection.immutable.</font></tt><tt><font color="#660099">Map[Int,java.lang.String]</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;=&nbsp;<font color="#660099">Map</font>(<font color="#000000">1</font>&nbsp;-&gt;&nbsp;a,&nbsp;<font color="#000000">2</font>&nbsp;-&gt;&nbsp;b)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#660099">Map</font>(<font color="#000000">"a"</font>&nbsp;-&gt;&nbsp;<font color="#000000">1</font>,&nbsp;<font color="#000000">"b"</font>&nbsp;-&gt;&nbsp;<font color="#000000">2</font>)&nbsp;map&nbsp;{&nbsp;<font color="#0000E5">case</font>&nbsp;(x,&nbsp;y)&nbsp;=&gt;&nbsp;y&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>res4:&nbsp;<font color="#660099">scala.collection.immutable.</font></tt><tt><font color="#660099">Iterable[Int]</font>&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;=&nbsp;<font color="#660099">List</font>(<font color="#000000">1</font>,&nbsp;<font color="#000000">2</font>)</tt></td>
+</tr>
+</table>
+</div>
+<p>最初の関数はキー/値ペアの二つの引数を交換する。この転換の戻り値は再びマップだが、逆方向を向いている。事実、最初の式は元のマップが可逆 (invertible) である場合、逆写像 (inverse mapping) を表す。 しかし、第二の関数はキー/値ペアを、単一の整数（値成分）に写像する。この場合、戻り値から <tt>Map</tt> を形成することはできないが、その親トレイトである <tt>Iterable</tt> を形成することができる。</p>
+<p>なぜ <tt>map</tt> を同じ種類のコレクションを返すように制限しないのかと疑問に思うかもしれない。例えば、ビット集合の <tt>map</tt> は「 <tt>Int</tt> を取り <tt>Int</tt> を返す」の関数のみを受け入れ、マップは「ペアを取りペアを返す」関数のみを受け入れるということだ。このような制限はオブジェクト指向のモデリングという視点から望ましくないだけでなく、リスコフの置換原則 (Liskov substitution principle) に反するため違法である。全ての <tt>Map</tt> は <tt>Iterable</tt> である。 そのため、<tt>Iterable</tt> について合法な全ての演算は <tt>Map</tt> についても合法でなくてはならない。</p>
+<p>Scala はこの問題をオーバーロードを用いて解決するが、これは（十分に柔軟ではないため） Java から継承した単純な形のオーバーロードではなく、暗黙のパラメータ (implicit parameter) により提供される体系的な形のオーバーロードだ。</p>
+<p><a name="lst:map" id="lst:map">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;map[B,&nbsp;<font color="#660099">That</font>](p:&nbsp;<font color="#660099">Elem</font>&nbsp;=&gt;&nbsp;B)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(<font color="#0000E5">implicit</font>&nbsp;bf:&nbsp;<font color="#660099">CanBuildFrom[B, That, This]</font>):&nbsp;<font color="#660099">That</font>&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;b&nbsp;=&nbsp;bf(<font color="#0000E5">this</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">for</font>&nbsp;(x&nbsp;&lt;-&nbsp;<font color="#0000E5">this</font>)&nbsp;b&nbsp;+=&nbsp;f(x)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;b.result</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center"><tt>TraversableLike</tt> における <tt>map</tt> の実装</div>
+<p>上記のコードは <tt>TraversableLike</tt> トレイトの <tt>map</tt> の実装を示す。<a href="collections-impl_2.html"><tt>TraversableLike</tt> クラスの例</a>で見た <tt>filter</tt> の例に似ている。主な違いは、<tt>filter</tt> が <tt>TraversableLike</tt> クラスの抽象メソッドである <tt>newBuilder</tt> メソッドを用いた所に、 <tt>map</tt> は、暗黙のパラメータとして渡される <tt>CanBuildFrom</tt> 型の<em>ビルダファクトリ</em> (builder factory) を使っていることだ。</p>
+<p><a name="lst:CanBuildFrom" id="lst:CanBuildFrom">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">package</font>&nbsp;scala.collection.generic</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">trait</font>&nbsp;<font color="#660099">CanBuildFrom[-From, -Elem, +To]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<i>//&nbsp;新しいビルダを作成する&nbsp;</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(from:&nbsp;<font color="#660099">From</font>):&nbsp;<font color="#660099">Builder[Elem, To]</font>&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center"><tt>CanBuildFrom</tt> トレイト</div>
+<p>上記のコードは、ビルダファクトリを表す <tt>CanBuildFrom</tt> トレイトの定義を示す。構築されるコレクションの要素型を示す <tt>Elem</tt>、構築するコレクションの型の <tt>To</tt>、そしてこのビルダファクトリが適用される型を示す <tt>From</tt> の三つの型パラメータを持つ。適切な暗黙のビルダファクトリを定義することによって、型の振る舞いを必要に応じて適応させることができる仕組みだ。<tt>BitSet</tt> クラスを例にとる。このコンパニオンオブジェクトは <tt>CanBuildFrom[BitSet,</tt>&nbsp;<tt>Int,</tt>&nbsp;<tt>BitSet]</tt> 型のビルダファクトリを含む。これは、<tt>BitSet</tt> について演算をするとき、構築されるコレクションの要素型が <tt>Int</tt> である限りもう一つの <tt>BitSet</tt> が構築されるということを意味する。そうでない場合は、いつでも別の暗黙のビルダファクトリに後退することができ、この場合は
+<tt>mutable.Set</tt> のコンパニオンオブジェクトによって実装されるものになる。このビルダファクトリは、ジェネリックな型パラメータ <tt>A</tt> を取るより一般的な型だ:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#660099">CanBuildFrom[Set[_], A, Set[A]]</font></tt></td>
+</tr>
+</table>
+</div>
+<p>これは、存在型 (existential type) <tt>Set[_]</tt> によって表現された任意の <tt>Set</tt> についての演算は、要素型 <tt>A</tt> が何であろうとも、<tt>Set</tt> を再び構築することができることを意味する。このように二つの暗黙の <tt>CanBuildFrom</tt> のインスタンスがある場合、最も特定されており適切なものを選ぶという Scala の暗黙のパラメータ解決 (implicit resolution) の規則に頼ることができる。</p>
+<p>暗黙のパラメータ解決は <tt>map</tt> のようなトリッキーなコレクション演算の正しい静的型を提供することが分かった。しかし、動的型についはどうだろう。具体的には、<tt>Iterable</tt> を静的型とするリストの値があったとして、その値についてなんらかの関数を map したとする:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;xs:&nbsp;<font color="#660099">Iterable[Int]</font>&nbsp;=&nbsp;<font color="#660099">List</font>(<font color="#000000">1</font>,&nbsp;<font color="#000000">2</font>,&nbsp;<font color="#000000">3</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">xs:&nbsp;Iterable[Int]&nbsp;=&nbsp;List(1,&nbsp;2,&nbsp;3)</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;ys&nbsp;=&nbsp;xs&nbsp;map&nbsp;(x&nbsp;=&gt;&nbsp;x&nbsp;*&nbsp;x)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">ys:&nbsp;Iterable[Int]&nbsp;=&nbsp;List(1,&nbsp;4,&nbsp;9)</font></tt></td>
+</tr>
+</table>
+</div>
+<p>上記の <tt>ys</tt> の静的型は、期待どおり <tt>Iterable</tt> だ。しかし、動的型は <tt>List</tt> のままであり、そうであるべきだ。この振る舞いはもう一段階の抽象化によって実現されている。<tt>CanBuildFrom</tt> の <tt>apply</tt> メソッドに元のコレクションが引数として渡されているのだ。ジェネリックな Traversable のためのビルダファクトリの多く（末端クラスのためのビルダファクトリ以外は全て）は、これをコレクションの <tt>genericBuilder</tt> メソッドに委譲する。<tt>genericBuilder</tt> メソッドは、自身が定義されているコレクションのビルダを呼び出す。つまり、Scala は静的な暗黙のパラメータ解決を用いて <tt>map</tt> の型制限を解決するが、この制限に最適な動的型は仮想ディスパッチ (virtual dispatch) によって選択されている。</p>
+<p>続いては、<a href="collections-impl_3.html">新しいコレクションへの統合</a></p>
+<hr />
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_1.html"><img border="0" alt="ビルダ" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b>共通する演算の摘出</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+</body>
+</html>
