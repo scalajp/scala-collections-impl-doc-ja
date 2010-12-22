@@ -11,7 +11,7 @@
 <body dir="ltr">
 <table width="100%" cellpadding="0" cellspacing="2">
 <tr>
-<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションの参入" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_1.html"><img border="0" alt="ビルダ" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
 <td align="center" bgcolor="#99CCFF" width="100%"><b>共通する演算の摘出</b></td>
@@ -377,11 +377,11 @@
 </table>
 </div>
 <p>上記の <tt>ys</tt> の静的型は、期待どおり <tt>Iterable</tt> だ。しかし、動的型は <tt>List</tt> のままであり、そうであるべきだ。この振る舞いはもう一段階の抽象化によって実現されている。<tt>CanBuildFrom</tt> の <tt>apply</tt> メソッドに元のコレクションが引数として渡されているのだ。ジェネリックな Traversable のためのビルダファクトリの多く（末端クラスのためのビルダファクトリ以外は全て）は、これをコレクションの <tt>genericBuilder</tt> メソッドに委譲する。<tt>genericBuilder</tt> メソッドは、自身が定義されているコレクションのビルダを呼び出す。つまり、Scala は静的な暗黙のパラメータ解決を用いて <tt>map</tt> の型制限を解決するが、この制限に最適な動的型は仮想ディスパッチ (virtual dispatch) によって選択されている。</p>
-<p>続いては、<a href="collections-impl_3.html">新しいコレクションへの統合</a></p>
+<p>続いては、<a href="collections-impl_3.html">新しいコレクションの参入</a></p>
 <hr />
 <table width="100%" cellpadding="0" cellspacing="2">
 <tr>
-<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションの参入" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_1.html"><img border="0" alt="ビルダ" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
 <td align="center" bgcolor="#99CCFF" width="100%"><b>共通する演算の摘出</b></td>
