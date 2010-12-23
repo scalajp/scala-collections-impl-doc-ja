@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content="HTML Tidy for Mac OS X (vers 25 March 2009), see www.w3.org" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Scala コレクションのアーキテクチャ -- RNA メソッドの戻り値型の適応</title>
+<link rel="stylesheet" type="text/css" href="guide.css" />
+</head>
+<body dir="ltr">
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_5.html"><img border="0" alt="map 類の取り扱い" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションの参入" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b><tt>RNA</tt> メソッドの戻り値型の適応</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+<h1><tt>RNA</tt> メソッドの戻り値型の適応</h1>
+<p>以下に <tt>RNA1</tt> を使った具体例を示す:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna1.length</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>res2:&nbsp;<font color="#660099">Int</font>&nbsp;=&nbsp;<font color="#000000">5</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna1.last</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>res3:&nbsp;<font color="#660099">Base</font>&nbsp;=&nbsp;C</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna1.take(<font color="#000000">3</font>)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>res4:&nbsp;<font color="#660099">IndexedSeq[Base]</font>&nbsp;=&nbsp;<font color="#660099">Vector</font>(A,&nbsp;U,&nbsp;G)</tt></td>
+</tr>
+</table>
+</div>
+<p>最初の二つの結果は予想通りかもしれないが、最後の <tt>rna1</tt> から先頭の三つの要素を take した結果は予想外だったかもしれない。事実、戻り値は静的型として <tt>IndexedSeq[Base]</tt> をとり、動的型として <tt>Vector</tt> をとる。<tt>RNA1</tt> 値を期待していたかもしれない。しかし、<a href="collections-impl_3.html#lst:rna1">RNA1 クラスのコード</a>で行ったのは <tt>RNA1</tt> を <tt>IndexedSeq</tt> から継承しただけだったので、それは不可能だ。一方 <tt>IndexedSeq</tt> クラスは <tt>IndexedSeq</tt> を返す <tt>take</tt> メソッドを持ち、 <tt>IndexedSeq</tt> のデフォルトの実装は <tt>Vector</tt> だ。 上記のやりとりの最後の行に出てくるベクトルはここからきている。</p>
+<p><a name="lst:rna2" id="lst:rna2">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">final</font>&nbsp;<font color="#0000E5">class</font>&nbsp;RNA2&nbsp;<font color="#0000E5">private</font>&nbsp;(</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;groups:&nbsp;<font color="#660099">Array[Int]</font>,</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;length:&nbsp;<font color="#660099">Int</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;)&nbsp;<font color="#0000E5">extends</font>&nbsp;<font color="#660099">IndexedSeq[Base]</font>&nbsp;<font color="#0000E5">with</font>&nbsp;<font color="#660099">IndexedSeqLike[Base, RNA2]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">import</font>&nbsp;RNA2.</tt><tt>_</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">override</font>&nbsp;<font color="#0000E5">def</font>&nbsp;newBuilder:&nbsp;<font color="#660099">Builder[Base, RNA2]</font>&nbsp;=&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">ArrayBuffer[Base]</font>&nbsp;mapResult&nbsp;fromSeq</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(idx:&nbsp;<font color="#660099">Int</font>):&nbsp;<font color="#660099">Base</font>&nbsp;=&nbsp;<i>//&nbsp;前と同じ</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center">RNA鎖クラス、第二版</div>
+<p>現状の把握ができた所で、これを解決するために何を変更するべきかというのが次の問題だろう。一つの方法としては、<tt>RNA1</tt> クラスの <tt>take</tt> メソッドをオーバーライドしてしまうというのがある:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">def</font>&nbsp;take(count:&nbsp;<font color="#660099">Int</font>):&nbsp;RNA1&nbsp;=&nbsp;RNA1.fromSeq(<font color="#0000E5">super</font>.take(count))</tt></td>
+</tr>
+</table>
+</div>
+これは <tt>take</tt> に関しては解決する。しかし、<tt>drop</tt> や <tt>filter</tt> や <tt>init</tt> に関してはどうだろう。 事実、列には 50以上の列を再び返すメソッドがある。一貫性を持たせるためには、これら全てをオーバーライドする必要がある。この方法の魅力がどんどん色あせていくのが分かるだろう。幸い、同じ効果がある別のもっと簡単な方法がある。RNA クラスは、<tt>IndexedSeq</tt> だけでなく、その実装トレイトである <tt>IndexedSeqLike</tt> も継承すればいいのだ。これは、上記の RNA2 クラスのコードに示した。この新しい実装は、以前のものと比べて二つの側面においてしか違わない。第一に、<tt>RNA2</tt> クラスは <tt>IndexedSeqLike[Base,</tt>&nbsp;<tt>RNA2]</tt> を継承する。<tt>IndexedSeqLike</tt> トレイトは、<tt>IndexedSeq</tt> の全ての具象メソッド (concrete
+method) を拡張可能な方法で実装する。例えば、<tt>take</tt>、<tt>drop</tt>、<tt>filter</tt>、や <tt>init</tt> のようなメソッドの戻り値の型は <tt>IndexedSeqLike</tt> クラスに渡された第二の型パラメータ、つまり <tt>RNA2</tt> 自身となる。
+<p>これを実現するために <tt>IndexedSeqLike</tt> 自身が、正しい種類のビルダを作成する <tt>newBuilder</tt> 抽象体に基づいている。<tt>IndexedSeqLike</tt> トレイトの子クラスは自身の種類のコレクションを返すために <tt>newBuilder</tt> をオーバーライドしなくてはいけない。<tt>RNA2</tt> クラスでは <tt>newBuilder</tt> メソッドは <tt>Builder[Base,</tt>&nbsp;<tt>RNA2]</tt> 型のビルダを返す。</p>
+<p>このビルダを構築するために、まず自身が <tt>Builder[Base,</tt>&nbsp;<tt>ArrayBuffer]</tt> でもある <tt>ArrayBuffer</tt> が作成される。次に、<tt>ArrayBuffer</tt> ビルダを <tt>mapResult</tt> を呼び出すことで <tt>RNA2</tt> ビルダに変換する。<tt>mapResult</tt> メソッドは、<tt>ArrayBuffer</tt> から <tt>RNA2</tt> への変換関数を引数として期待する。渡された関数は、任意の塩基列から <tt>RNA2</tt> に変換する <tt>RNA2.fromSeq</tt> だ（配列バッファは列の一種なので、<tt>RNA2.fromSeq</tt> を適用できる）。</p>
+<p>もし <tt>newBuilder</tt> を定義しなかったとすると、以下のようなエラーが発生しただろう:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt><i>RNA2.scala:5:&nbsp;error:&nbsp;overriding&nbsp;method&nbsp;newBuilder&nbsp;in&nbsp;trait</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><i>TraversableLike&nbsp;of&nbsp;type&nbsp;=&gt;&nbsp;scala.collection.mutable.</i></tt><tt><i>Builder[Base,RNA2];</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><i>&nbsp;method&nbsp;newBuilder&nbsp;in&nbsp;trait&nbsp;GenericTraversableTemplate&nbsp;of&nbsp;type</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><i>&nbsp;=&gt;&nbsp;scala.collection.mutable.</i></tt><tt><i>Builder[Base,IndexedSeq[Base]]&nbsp;has</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><i>&nbsp;incompatible&nbsp;type</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><i>class&nbsp;RNA2&nbsp;private&nbsp;(val&nbsp;groups:&nbsp;Array[Int],&nbsp;val&nbsp;length:&nbsp;Int)&nbsp;</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;^</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><i>one&nbsp;error&nbsp;found</i></tt></td>
+</tr>
+</table>
+</div>
+<p>込み入ったコレクションライブラリの仕組みを反映して、このエラーメッセージも非常に長く複雑なものになっている。メソッドの由来に関する情報は、この場合は、役に立つというよりは問題の核心から注意を逸らすことになるので無視することにする。残りは、戻り値型が <tt>Builder[Base,</tt>&nbsp;<tt>RNA2]</tt> である <tt>newBuilder</tt> メソッドが定義される必要があるが、戻り値型が <tt>Builder[Base,IndexedSeq[Base]]</tt> のメソッド <tt>newBuilder</tt> ということだ。後者は前者をオーバーライドしない。戻り値型が <tt>Builder[Base,</tt>&nbsp;<tt>RNA2]</tt> の最初のメソッドは、<a href="collections-impl_4.html#lst:rna2">RNA2 クラスのコード</a>において、<tt>IndexedSeqLike</tt> の型パラメータに <tt>RNA2</tt>
+が渡されたことによってこの型でインスタンス化された抽象メソッドだ。戻り値型が <tt>Builder[Base,IndexedSeq[Base]]</tt> の二番目のメソッドは、継承した <tt>IndexedSeq</tt> クラスによって提供されているものだ。別の言い方をすると、最初の戻り値型の <tt>newBuilder</tt> 無しでは <tt>RNA2</tt> は無効ということだ。</p>
+<p><a href="collections-impl_4.html#lst:rna2">RNA2 クラス</a>のより洗練された実装により、<tt>take</tt>、<tt>drop</tt>、<tt>filter</tt> などのメソッドは期待通り作動する:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;rna2&nbsp;=&nbsp;RNA2(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;T)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">rna2:&nbsp;RNA2&nbsp;=&nbsp;RNA2(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;T)</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna2&nbsp;take&nbsp;<font color="#000000">3</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res5:&nbsp;RNA2&nbsp;=&nbsp;RNA2(A,&nbsp;U,&nbsp;G)</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna2&nbsp;filter&nbsp;(U&nbsp;!</tt><tt>=)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res6:&nbsp;RNA2&nbsp;=&nbsp;RNA2(A,&nbsp;G,&nbsp;G,&nbsp;T)</font></tt></td>
+</tr>
+</table>
+</div>
+<p>続いては、<a href="collections-impl_5.html"><tt>map</tt> 類の取り扱い</a></p>
+<hr />
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_5.html"><img border="0" alt="map 類の取り扱い" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_3.html"><img border="0" alt="新しいコレクションの参入" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b><tt>RNA</tt> メソッドの戻り値型の適応</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+</body>
+</html>
