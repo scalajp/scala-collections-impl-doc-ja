@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content="HTML Tidy for Mac OS X (vers 25 March 2009), see www.w3.org" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Scala コレクションのアーキテクチャ -- 新しいコレクションの参入</title>
+<link rel="stylesheet" type="text/css" href="guide.css" />
+</head>
+<body dir="ltr">
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_4.html"><img border="0" alt="RNA メソッドの戻り値型の適応" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_2.html"><img border="0" alt="共通する演算の摘出" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b>新しいコレクションの参入</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+<h1>新しいコレクションの参入</h1>
+<p>定義済みの演算を正しい型で利用できるように新しいコレクションクラスを参入させるには何が必要だろうか。これから数ページにわたって、二つの具体例を見てみよう。</p>
+<p><b><font size="+1">列の参入</font></b></p>
+<p><a name="lst:bases" id="lst:bases">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">abstract</font>&nbsp;<font color="#0000E5">class</font>&nbsp;<font color="#660099">Base</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">case</font>&nbsp;<font color="#0000E5">object</font>&nbsp;A&nbsp;<font color="#0000E5">extends</font>&nbsp;<font color="#660099">Base</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">case</font>&nbsp;<font color="#0000E5">object</font>&nbsp;G&nbsp;<font color="#0000E5">extends</font>&nbsp;<font color="#660099">Base</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">case</font>&nbsp;<font color="#0000E5">object</font>&nbsp;C&nbsp;<font color="#0000E5">extends</font>&nbsp;<font color="#660099">Base</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">case</font>&nbsp;<font color="#0000E5">object</font>&nbsp;U&nbsp;<font color="#0000E5">extends</font>&nbsp;<font color="#660099">Base</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">object</font>&nbsp;<font color="#660099">Base</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;fromInt:&nbsp;<font color="#660099">Int</font>&nbsp;=&gt;&nbsp;<font color="#660099">Base</font>&nbsp;=&nbsp;<font color="#660099">Array</font>(A,&nbsp;G,&nbsp;C,&nbsp;U)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;toInt:&nbsp;<font color="#660099">Base</font>&nbsp;=&gt;&nbsp;<font color="#660099">Int</font>&nbsp;=&nbsp;<font color="#660099">Map</font>(A&nbsp;-&gt;&nbsp;<font color="#000000">0</font>,&nbsp;G&nbsp;-&gt;&nbsp;<font color="#000000">1</font>,&nbsp;C&nbsp;-&gt;&nbsp;<font color="#000000">2</font>,&nbsp;U&nbsp;-&gt;&nbsp;<font color="#000000">3</font>)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center">RNA 塩基</div>
+<p><a name="lst:rna1" id="lst:rna1">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">import</font>&nbsp;collection.</tt><tt>IndexedSeqLike</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">import</font>&nbsp;collection.mutable.{</tt><tt><font color="#660099">Builder</font>,&nbsp;<font color="#660099">ArrayBuffer</font>}</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">import</font>&nbsp;collection.generic.</tt><tt>CanBuildFrom</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">final</font>&nbsp;<font color="#0000E5">class</font>&nbsp;RNA1&nbsp;<font color="#0000E5">private</font>&nbsp;(<font color="#0000E5">val</font>&nbsp;groups:&nbsp;<font color="#660099">Array[Int]</font>,</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;length:&nbsp;<font color="#660099">Int</font>)&nbsp;<font color="#0000E5">extends</font>&nbsp;<font color="#660099">IndexedSeq[Base]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">import</font>&nbsp;RNA1.</tt><tt>_</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(idx:&nbsp;<font color="#660099">Int</font>):&nbsp;<font color="#660099">Base</font>&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">if</font>&nbsp;(idx&nbsp;&lt;&nbsp;<font color="#000000">0</font>&nbsp;||&nbsp;length&nbsp;&lt;=&nbsp;idx)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">throw</font>&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">IndexOutOfBoundsException</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Base.fromInt(groups(idx&nbsp;/&nbsp;N)&nbsp;&gt;&gt;&nbsp;(idx&nbsp;<i>%</i>&nbsp;N&nbsp;*&nbsp;S)&nbsp;&amp;&nbsp;M)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">object</font>&nbsp;RNA1&nbsp;{</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<i>//&nbsp;グループを表すのに必要なビット数</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">private</font>&nbsp;<font color="#0000E5">val</font>&nbsp;S&nbsp;=&nbsp;<font color="#000000">2</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<i>// Int に収まるグループ数</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">private</font>&nbsp;<font color="#0000E5">val</font>&nbsp;N&nbsp;=&nbsp;<font color="#000000">32</font>&nbsp;/&nbsp;S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<i>//&nbsp;グループを分離するマスク</i></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">private</font>&nbsp;<font color="#0000E5">val</font>&nbsp;M&nbsp;=&nbsp;(<font color="#000000">1</font>&nbsp;&lt;&lt;&nbsp;S)&nbsp;-&nbsp;<font color="#000000">1</font>&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;fromSeq(buf:&nbsp;<font color="#660099">Seq[Base]</font>):&nbsp;RNA1&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;groups&nbsp;=&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">Array[Int]</font>((buf.length&nbsp;+&nbsp;N&nbsp;-&nbsp;<font color="#000000">1</font>)&nbsp;/&nbsp;N)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">for</font>&nbsp;(i&nbsp;&lt;-&nbsp;<font color="#000000">0</font>&nbsp;until&nbsp;buf.length)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;groups(i&nbsp;/&nbsp;N)&nbsp;|=&nbsp;Base.toInt(buf(i))&nbsp;&lt;&lt;&nbsp;(i&nbsp;<i>%</i>&nbsp;N&nbsp;*&nbsp;S)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">new</font>&nbsp;RNA1(groups,&nbsp;buf.length)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(bases:&nbsp;<font color="#660099">Base</font>*)&nbsp;=&nbsp;fromSeq(bases)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center">RNA鎖クラス、第一版</div>
+<p>A（アデニン）、G（グアニン）、C（シトシン）、および U（ウラシル）の塩基の列からなる RNA鎖のための新しい列型を作成したいとする。上記の<a href="collections-impl_3.html#lst:bases">RNA 塩基のコード</a>に示したように、塩基の定義は簡単なものだ。</p>
+<p>全ての塩基は共通の抽象クラス <tt>Base</tt> を継承するケースオブジェクトとして定義される。<tt>Base</tt> クラスにはコンパニオンオブジェクトがあり、塩基と 0〜3 の整数を関連付ける二つの関数を定義する。これらの関数ではコレクションを使った関数の実装を二つの異なる方法で例示した。<tt>toInt</tt> 関数は <tt>Base</tt> から整数への <tt>Map</tt> として実装される。逆関数の <tt>fromInt</tt> は配列として実装された。これは、マップと配列の両方が <tt>Function1</tt> を継承する<em>関数である</em>ことを利用している。</p>
+<p>次に、RNA鎖のためのクラスを定義する。概念的には、RNA鎖は単に <tt>Seq[Base]</tt> だ。しかし、RNA鎖は非常に長くなる可能性があるため、コンパクトな表現方法を考えてみよう。四つの塩基しかないため、一つの塩基は 2ビットで識別でき、一つの整数内に 16 の塩基を 2ビット値として格納できる。後は、パック化した表現を用いる特殊な <tt>Seq[Base]</tt> の子クラスを構築すればいいと。</p>
+<p><a href="collections-impl_3.html#lst:rna1">RNA鎖クラスのコード</a>は、この第一版を表す。これは後により洗練されたものに修正される。 <tt>RNA1</tt> は <tt>Int</tt> 配列を第一引数として取るコンストラクタを持つ。この配列は、各要素に 16の塩基を持つ（ただし、最後の要素は空きが許される）パック化された RNA データを含む。第二引数の <tt>length</tt> は配列（および列）中の塩基の数を指定する。<tt>RNA1</tt> クラスは <tt>IndexedSeq[Base]</tt> を拡張する。 <tt>scala.collection.immutable</tt> パッケージの <tt>IndexedSeq</tt> トレイトは <tt>length</tt> と <tt>apply</tt> の二つの抽象メソッドを定義する。これらは具象子クラス (concrete subclass) 内で実装されなくてはいけない。<tt>RNA1</tt>
+は同名のパラメータフィールドを定義することで自動的に <tt>length</tt> を実装する。<a href="collections-impl_3.html#lst:rna1">RNA1 クラスのコード</a>で示したように添字メソッドの <tt>apply</tt> を実装する。基本的には、<tt>apply</tt> はまず <tt>groups</tt> 配列から整数値を抽出して、次に右シフト（<tt>&gt;&gt;</tt>）とマスク（<tt>&amp;</tt>）を用いて適切な 2ビット値を抽出する。プライベートな定数 <tt>S</tt>、<tt>N</tt>、および <tt>M</tt> は <tt>RNA1</tt> コンパニオンオブジェクトにて定義される。<tt>S</tt> は各パケットのサイズ（つまり 2）を指定し、<tt>N</tt> は整数毎の 2ビットパケットの数を指定し、<tt>M</tt> はワードから下位 <tt>S</tt> ビットを抽出するためのビットマスクだ。</p>
+<p><tt>RNA1</tt> クラスのコンストラクタが <tt>private</tt> であることに注意してほしい。これは、<tt>RNA1</tt> シークエンスがパック化された配列によって表現されていることをクライアントから隠蔽するため、彼らが <tt>new</tt> を呼び出して <tt>RNA1</tt> シークエンスを作成できないことを意味する。クライアントから <tt>RNA</tt> シークエンスの内部表現が隠されていることで、クライアント側のコードに影響無く内部表現を変更することができる。別の言い方をすると、この設計は RNA シークエンスのインターフェイスと実装の分離 (decoupling) を実現する。しかし、<tt>new</tt> を用いた RNA シークエンスの作成が不可能な場合、RNA シークエンスを作成する他の方法がなければクラスそのものが役に立たない。<tt>RNA1</tt> のコンパニオンオブジェクトは RNA シークエンスの作成のための二つの方法を提供する。第一の方法は、塩基の列（<tt>Seq[Base]</tt> の値）を
+<tt>RNA1</tt> クラスのインスタンスに変換する <tt>fromSeq</tt> メソッドだ。<tt>fromSeq</tt> メソッドは、引数の列に含まれる塩基を配列にパック化した後、その配列と元の列の長さを引数として <tt>RNA1</tt> のプライベートなコンストラクタを呼び出す。これは、クラスのコンパニオンオブジェクトからプライベートなコンストラクタが使えることを利用している。</p>
+<p><tt>RNA1</tt>値を作成する第二の方法は、<tt>RNA1</tt> オブジェクトの <tt>apply</tt> メソッドにより提供される。これは可変数の <tt>Base</tt> を引数として取り、列として <tt>fromSeq</tt> に渡す。以下に二つの作成方法の具体例を見てみる:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;xs&nbsp;=&nbsp;<font color="#660099">List</font>(A,&nbsp;G,&nbsp;T,&nbsp;A)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">xs:&nbsp;List[Product&nbsp;with&nbsp;Base]&nbsp;=&nbsp;List(A,&nbsp;G,&nbsp;T,&nbsp;A)</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;RNA1.fromSeq(xs)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res1:&nbsp;RNA1&nbsp;=&nbsp;RNA1(A,&nbsp;G,&nbsp;T,&nbsp;A)</font></tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;rna1&nbsp;=&nbsp;RNA1(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;T)</tt></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">rna1:&nbsp;RNA1&nbsp;=&nbsp;RNA1(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;T)</font></tt></td>
+</tr>
+</table>
+</div>
+<p>次へ、<a href="collections-impl_4.html"><tt>RNA</tt> メソッドの戻り値型の適応</a></p>
+<hr />
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_4.html"><img border="0" alt="RNA メソッドの戻り値型の適応" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_2.html"><img border="0" alt="共通する演算の摘出" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b>新しいコレクションの参入</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+</body>
+</html>
