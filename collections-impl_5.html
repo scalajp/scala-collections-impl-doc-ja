@@ -1,0 +1,531 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content="HTML Tidy for Mac OS X (vers 25 March 2009), see www.w3.org" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Scala コレクションのアーキテクチャ -- map 類の取り扱い</title>
+<link rel="stylesheet" type="text/css" href="guide.css" />
+</head>
+<body dir="ltr">
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_6.html"><img border="0" alt="新しい集合やマップへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_4.html"><img border="0" alt="RNA メソッドの戻り値型の適応" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b><tt>map</tt> 類の取り扱い</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+<h1><tt>map</tt> 類の取り扱い</h1>
+<p>しかし、まだ取り扱っていないコレクションのメソッドの種類が一つある。これらのメソッドは、はっきりとしたコレクションの型を返さない。同じ種類のコレクションを返すかもしれないが、要素型が異なったりする。この古典的な例が <tt>map</tt> メソッドだ。もし <tt>s</tt> が <tt>Seq[Int]</tt> で、<tt>f</tt> が <tt>Int</tt> から <tt>String</tt> への関数である場合、<tt>s.map(f)</tt> は <tt>Seq[String]</tt> を返す。 つまり、要素型がレシーバから戻り値へと変わるが、コレクションの種類は変わらない。</p>
+<p>他にも <tt>map</tt> のように振る舞うメソッドはいくつもある。（<tt>flatMap</tt> や <tt>collect</tt> のように）それが明らかなメソッドもあるが、他のものは予想外かもしれない。例えば、追加のメソッド <tt>++</tt> も引数とは別の型の戻り値を返す可能性がある（<tt>Int</tt> のリストに <tt>String</tt> を追加すると <tt>Any</tt> のリストを返す）。これらのメソッドは RNA鎖にどう適応できるだろう。理想的には、RNA鎖について塩基から塩基へ写像した場合、再び RNA鎖が返ってくる:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;rna&nbsp;=&nbsp;RNA(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">rna:&nbsp;RNA&nbsp;=&nbsp;RNA(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C)</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna&nbsp;map&nbsp;{&nbsp;<font color="#0000E5">case</font>&nbsp;A&nbsp;=&gt;&nbsp;C&nbsp;<font color="#0000E5">case</font>&nbsp;b&nbsp;=&gt;&nbsp;b&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res7:&nbsp;RNA&nbsp;=&nbsp;RNA(C,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;T)</font></tt></td>
+</tr>
+</table>
+</div>
+<p>同様に、<tt>++</tt> を用いて二つの RNA鎖を連結した場合、再び別の RNA鎖を返すべきだ:
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna&nbsp;++&nbsp;rna</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res8:&nbsp;RNA&nbsp;=&nbsp;RNA(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C,&nbsp;A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C)</font></tt></td>
+</tr>
+</table>
+</div>
+<p>一方、RNA鎖について塩基を別の型に写像した場合は、新しい要素は違う型を持つので RNA鎖を返すことができない。代わりに、列を返さなくてはならない。同様に、RNA鎖に対して <tt>Base</tt> 型以外の要素を追加した場合は、RNA鎖ではなく、一般の列を返す。</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna&nbsp;map&nbsp;Base.toInt</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>res2:&nbsp;<font color="#660099">IndexedSeq[Int]</font>&nbsp;=&nbsp;<font color="#660099">Vector</font>(<font color="#000000">0</font>,&nbsp;<font color="#000000">3</font>,&nbsp;<font color="#000000">1</font>,&nbsp;<font color="#000000">1</font>,&nbsp;<font color="#000000">2</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna&nbsp;++&nbsp;<font color="#660099">List</font>(<font color="#000000">"missing"</font>,&nbsp;<font color="#000000">"data"</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>res3:&nbsp;<font color="#660099">IndexedSeq[java.lang.</font></tt><tt>Object</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#660099">Vector</font>(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C,&nbsp;missing,&nbsp;data)</tt></td>
+</tr>
+</table>
+</div>
+<p>上記は理想的な場合に期待されるものだが、<a href="collections-impl_4.html#lst:rna2"><tt>RNA2</tt> クラス</a>が提供するものではない。事実、最初の二つの具体例をこのクラスで実行すると以下のような結果となる:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;rna2&nbsp;=&nbsp;RNA2(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">rna2:&nbsp;RNA2&nbsp;=&nbsp;RNA2(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C)</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna2&nbsp;map&nbsp;{&nbsp;<font color="#0000E5">case</font>&nbsp;A&nbsp;=&gt;&nbsp;C&nbsp;<font color="#0000E5">case</font>&nbsp;b&nbsp;=&gt;&nbsp;b&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res0:&nbsp;IndexedSeq[Base]&nbsp;=&nbsp;Vector(C,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C)</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;rna2&nbsp;++&nbsp;rna2</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res1:&nbsp;IndexedSeq[Base]&nbsp;=&nbsp;Vector(A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C,&nbsp;A,&nbsp;U,&nbsp;G,&nbsp;G,&nbsp;C)</font></tt></td>
+</tr>
+</table>
+</div>
+<p>つまり、<tt>map</tt> や <tt>++</tt> の戻り値は、生成されるコレクションの要素の型が塩基であっても RNA鎖ではないということだ。改善するには、<tt>map</tt> メソッドのシグネチャを観察して損はない（もしくは同様のシグネチャを持つ <tt>++</tt>）。<tt>map</tt> メソッドは <tt>scala.collection.TraversableLike</tt> クラスにて以下のシグネチャで定義されている:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">def</font>&nbsp;map[B,&nbsp;<font color="#660099">That</font>](f:&nbsp;A&nbsp;=&gt;&nbsp;B)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;(<font color="#0000E5">implicit</font>&nbsp;cbf:&nbsp;<font color="#660099">CanBuildFrom[Repr, B, That]</font>):&nbsp;<font color="#660099">That</font></tt></td>
+</tr>
+</table>
+</div>
+<p>ここで、<tt>A</tt> はコレクションの要素の型で、<tt>Repr</tt> はコレクションそのものの型だ（これは、<tt>TraversableLike</tt> や <tt>IndexedSeqLike</tt> などの実装トレイトに二番目の型パラメータとして渡される）。<tt>map</tt> メソッドは、<tt>B</tt> と <tt>That</tt> というもう二つの型パラメータを取る。<tt>B</tt> パラメータは、写像関数の戻り値型を表し、これは新しいコレクションの要素型でもある。<tt>That</tt> は、<tt>map</tt> の戻り値型であるため、新たに作成されるコレクションの型を表す。</p>
+<p>では、<tt>That</tt> 型はどのように決定されるのだろう。実は、これは <tt>CanBuildFrom[Repr,</tt>&nbsp;<tt>B,</tt>&nbsp;<tt>That]</tt> 型の暗黙のパラメータ <tt>cbf</tt> によって別の型に繋がっている。これらの <tt>CanBuildFrom</tt> の暗黙の値 (implicit value) は、それぞれのコレクションクラスにより定義されている。要約すると <tt>CanBuildFrom[From,</tt>&nbsp;<tt>Elem,</tt>&nbsp;<tt>To]</tt> 型の暗黙の値は、「<tt>From</tt> 型のコレクションがあるとき、こうすれば要素型 <tt>Elem</tt> を持つ <tt>To</tt> 型のコレクションを構築できる」と言っているのだ。</p>
+<p><a name="lst:rna" id="lst:rna">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">final</font>&nbsp;<font color="#0000E5">class</font>&nbsp;RNA&nbsp;<font color="#0000E5">private</font>&nbsp;(<font color="#0000E5">val</font>&nbsp;groups:&nbsp;<font color="#660099">Array[Int]</font>,&nbsp;<font color="#0000E5">val</font>&nbsp;length:&nbsp;<font color="#660099">Int</font>)&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">extends</font>&nbsp;<font color="#660099">IndexedSeq[Base]</font>&nbsp;<font color="#0000E5">with</font>&nbsp;<font color="#660099">IndexedSeqLike[Base, RNA]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">import</font>&nbsp;RNA._</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<i>//&nbsp;`IndexedSeq` の `newBuilder`&nbsp;の必須再実装</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">override</font>&nbsp;<font color="#0000E5">protected</font>[<font color="#0000E5">this</font>]&nbsp;<font color="#0000E5">def</font>&nbsp;newBuilder:&nbsp;<font color="#660099">Builder[Base, RNA]</font>&nbsp;=&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;RNA.newBuilder</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<i>//&nbsp;`IndexedSeq` の`apply` の必須実装</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(idx:&nbsp;<font color="#660099">Int</font>):&nbsp;<font color="#660099">Base</font>&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">if</font>&nbsp;(idx&nbsp;&lt;&nbsp;<font color="#000000">0</font>&nbsp;||&nbsp;length&nbsp;&lt;=&nbsp;idx)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">throw</font>&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">IndexOutOfBoundsException</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;Base.fromInt(groups(idx&nbsp;/&nbsp;N)&nbsp;&gt;&gt;&nbsp;(idx&nbsp;<i>%</i>&nbsp;N&nbsp;*&nbsp;S)&nbsp;&amp;&nbsp;M)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<i>//&nbsp;効率を上げるための、&nbsp;</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<i>//&nbsp;必須ではない foreach の再実装</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">override</font>&nbsp;<font color="#0000E5">def</font>&nbsp;foreach[U](f:&nbsp;<font color="#660099">Base</font>&nbsp;=&gt;&nbsp;U):&nbsp;<font color="#660099">Unit</font>&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">var</font>&nbsp;i&nbsp;=&nbsp;<font color="#000000">0</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">var</font>&nbsp;b&nbsp;=&nbsp;<font color="#000000">0</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">while</font>&nbsp;(i&nbsp;&lt;&nbsp;length)&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;b&nbsp;=&nbsp;<font color="#0000E5">if</font>&nbsp;(i&nbsp;<i>%</i>&nbsp;N&nbsp;==&nbsp;<font color="#000000">0</font>)&nbsp;groups(i&nbsp;/&nbsp;N)&nbsp;<font color="#0000E5">else</font>&nbsp;b&nbsp;&gt;&gt;&gt;&nbsp;S</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;f(Base.fromInt(b&nbsp;&amp;&nbsp;M))</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;i&nbsp;+=&nbsp;<font color="#000000">1</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center">RNA鎖クラス、最終版</div>
+<p><a name="id2" id="id2">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">object</font>&nbsp;RNA&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">private</font>&nbsp;<font color="#0000E5">val</font>&nbsp;S&nbsp;=&nbsp;<font color="#000000">2</font>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>//&nbsp;number&nbsp;of&nbsp;bits&nbsp;in&nbsp;group</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">private</font>&nbsp;<font color="#0000E5">val</font>&nbsp;M&nbsp;=&nbsp;(<font color="#000000">1</font>&nbsp;&lt;&lt;&nbsp;S)&nbsp;-&nbsp;<font color="#000000">1</font>&nbsp;<i>//&nbsp;bitmask&nbsp;to&nbsp;isolate&nbsp;a&nbsp;group</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">private</font>&nbsp;<font color="#0000E5">val</font>&nbsp;N&nbsp;=&nbsp;<font color="#000000">32</font>&nbsp;/&nbsp;S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<i>//&nbsp;number&nbsp;of&nbsp;groups&nbsp;in&nbsp;an&nbsp;Int</i></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;fromSeq(buf:&nbsp;<font color="#660099">Seq[Base]</font>):&nbsp;RNA&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;groups&nbsp;=&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">Array[Int]</font>((buf.length&nbsp;+&nbsp;N&nbsp;-&nbsp;<font color="#000000">1</font>)&nbsp;/&nbsp;N)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">for</font>&nbsp;(i&nbsp;&lt;-&nbsp;<font color="#000000">0</font>&nbsp;until&nbsp;buf.length)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;groups(i&nbsp;/&nbsp;N)&nbsp;|=&nbsp;Base.toInt(buf(i))&nbsp;&lt;&lt;&nbsp;(i&nbsp;<i>%</i>&nbsp;N&nbsp;*&nbsp;S)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">new</font>&nbsp;RNA(groups,&nbsp;buf.length)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(bases:&nbsp;<font color="#660099">Base</font>*)&nbsp;=&nbsp;fromSeq(bases)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;newBuilder:&nbsp;<font color="#660099">Builder[Base, RNA]</font>&nbsp;=&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">ArrayBuffer</font>&nbsp;mapResult&nbsp;fromSeq</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">implicit</font>&nbsp;<font color="#0000E5">def</font>&nbsp;canBuildFrom:&nbsp;<font color="#660099">CanBuildFrom[RNA, Base, RNA]</font>&nbsp;=&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">CanBuildFrom[RNA, Base, RNA]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply():&nbsp;<font color="#660099">Builder[Base, RNA]</font>&nbsp;=&nbsp;newBuilder</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(from:&nbsp;RNA):&nbsp;<font color="#660099">Builder[Base, RNA]</font>&nbsp;=&nbsp;newBuilder</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center">RNA コンパニオンオブジェクト、最終版</div>
+<p>これで、<tt>RNA2</tt> シークエンスの <tt>map</tt> や <tt>++</tt> の振る舞いの謎が解けたと思う。<tt>RNA2</tt> シークエンスを作成する <tt>CanBuildFrom</tt> インスタンスが無いので、継承された <tt>IndexedSeq</tt> トレイトのコンパニオンオブジェクトから次善の <tt>CanBuildFrom</tt> が見つかったのだ。この暗黙の値は <tt>IndexedSeq</tt> を作成し、<tt>rna2</tt> に <tt>map</tt> を適用したときに返ったのがそれだということだ。</p>
+<p>この欠点を補うためには、RNA クラスのコンパニオンオブジェクト内に <tt>CanBuildFrom</tt> インスタンスの暗黙の値を定義する必要がある。そのインスタンスは <tt>CanBuildFrom[RNA,</tt>&nbsp;<tt>Base,</tt>&nbsp;<tt>RNA]</tt> 型を持つべきだ。つまり、このインスタンスは「ある RNA鎖があり、新しい要素型が <tt>Base</tt> であれば、RNA鎖である別のコレクションを構築できる」と述べる。上記に <a href="collections-impl_5.html#lst:rna">RNA クラス</a>と<a href="collections-impl_5.html#id2">そのコンパニオンオブジェクト</a>の詳細を示した。<a href="collections-impl_4.html#lst:rna2"><tt>RNA2</tt> クラス</a>と比べて二つの大きな違いがある。第一に、<tt>newBuilder</tt> の実装が RNA
+クラスからコンパニオンオブジェクトに移ったことだ。<tt>RNA</tt> クラスの <tt>newBuilder</tt> メソッドは単にこの定義に委譲する。第二に、<tt>RNA</tt> オブジェクト内に <tt>CanBuildFrom</tt> の暗黙の値がある。そのようなオブジェクトを作成するには、<tt>CanBuildFrom</tt> トレイト内の二つの <tt>apply</tt> メソッドを定義する必要がある。両方共 <tt>RNA</tt> コレクションのビルダを作成するが、異なる引数リストを持つ。<tt>apply()</tt> メソッドは単に正しい型の新たなビルダを作成する。 それに対して、<tt>apply(from)</tt> メソッドは、元のコレクションを引数として取る。これはビルダの戻り値の動的型をレシーバの動的型に合わせるのに有用となるかもしれない。<tt>RNA</tt> の場合は、<tt>RNA</tt> が final クラスであるため、静的型 <tt>RNA</tt> のレシーバは動的型も <tt>RNA</tt>
+であるため関係ない。それが <tt>apply(from)</tt> も単に <tt>newBuilder</tt> を呼び出すだけで引数を無視している理由だ。</p>
+<p>これで終わりだ。<a href="collections-impl_5.html#lst:rna"><tt>RNA</tt> クラス</a>の最終版は全てのコレクションメソッドを自然な型で実装する。この実装には「お約束事」が多少必要だった。要するに、<tt>newBuilder</tt> ファクトリと暗黙の値 <tt>canBuildFrom</tt> をどこに置けばいいのかを知る必要がある。利点としては、比較的少ないコードで多数のメソッドが自動的に定義されるということがある。また、多値演算である <tt>take</tt>、<tt>drop</tt>、<tt>map</tt>、や <tt>++</tt> を呼ばないならば、<a href="collections-impl_3.html#lst:rna1">RNA1 クラスのコード</a>で示した実装で止めておいて、ここまで頑張ったことをしないという選択もある。</p>
+<p>これまでの議論は、特定の型に従うメソッドを持つ新しい列を定義するのに必要な最小限のコードを中心に進めてきた。しかし、実際には新しい機能を追加したり、効率のために既存のメソッドをオーバライドしたいと思うかもしれない。具体例としては、<tt>RNA</tt> クラスのオーバーライドされた <tt>foreach</tt> メソッドがある。<tt>foreach</tt> メソッドは、コレクションに対するループを実装するのでただでも重要なメソッドだ。さらに、他の多くのメソッドは <tt>foreach</tt> に基づいて実装されている。そのため、このメソッドの最適化に労力を割くことは論理的であると言える。<tt>IndexedSeq</tt>内の <tt>foreach</tt> の標準実装は、単に <tt>apply</tt> を用いてコレクションの全ての <tt>i</tt>番目の要素を選択する（このとき <tt>i</tt> は <tt>0</tt> からコレクションの長さ - 1 の範囲）。つまり、標準実装は配列要素を選択し、パック化解除して塩基にするという作業を
+RNA鎖にある全ての要素に対して行うことになる。<tt>RNA</tt> クラスのオーバーライドする <tt>foreach</tt> はもう少し賢い。全ての配列の要素に対して、選択後直ちに要素に含まれる全ての塩基に渡された関数を適用する。そのため、配列の選択とパック化解除のための労力がかなり軽減される。</p>
+<p>続いては、<a href="collections-impl_6.html">新しい集合やマップへの統合</a></p>
+<hr />
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_6.html"><img border="0" alt="新しい集合やマップへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_4.html"><img border="0" alt="RNA メソッドの戻り値型の適応" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b><tt>map</tt> 類の取り扱い</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+</body>
+</html>
