@@ -11,7 +11,7 @@
 <body dir="ltr">
 <table width="100%" cellpadding="0" cellspacing="2">
 <tr>
-<td bgcolor="#99CCFF"><a href="collections-impl_6.html"><img border="0" alt="新しい集合やマップへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_6.html"><img border="0" alt="新しい集合やマップの参入" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_4.html"><img border="0" alt="RNA メソッドの戻り値型の適応" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
 <td align="center" bgcolor="#99CCFF" width="100%"><b><tt>map</tt> 類の取り扱い</b></td>
@@ -55,7 +55,7 @@
 </tr>
 </table>
 </div>
-<p>同様に、<tt>++</tt> を用いて二つの RNA鎖を連結した場合、再び別の RNA鎖を返すべきだ:
+<p>同様に、<tt>++</tt> を用いて二つの RNA鎖を連結した場合、再び別の RNA鎖を返すべきだ:</p>
 <div class="quote">
 <table cellspacing="1" cellpadding="0">
 <tr>
@@ -516,11 +516,11 @@
 <p>これで終わりだ。<a href="collections-impl_5.html#lst:rna"><tt>RNA</tt> クラス</a>の最終版は全てのコレクションメソッドを自然な型で実装する。この実装には「お約束事」が多少必要だった。要するに、<tt>newBuilder</tt> ファクトリと暗黙の値 <tt>canBuildFrom</tt> をどこに置けばいいのかを知る必要がある。利点としては、比較的少ないコードで多数のメソッドが自動的に定義されるということがある。また、多値演算である <tt>take</tt>、<tt>drop</tt>、<tt>map</tt>、や <tt>++</tt> を呼ばないならば、<a href="collections-impl_3.html#lst:rna1">RNA1 クラスのコード</a>で示した実装で止めておいて、ここまで頑張ったことをしないという選択もある。</p>
 <p>これまでの議論は、特定の型に従うメソッドを持つ新しい列を定義するのに必要な最小限のコードを中心に進めてきた。しかし、実際には新しい機能を追加したり、効率のために既存のメソッドをオーバライドしたいと思うかもしれない。具体例としては、<tt>RNA</tt> クラスのオーバーライドされた <tt>foreach</tt> メソッドがある。<tt>foreach</tt> メソッドは、コレクションに対するループを実装するのでただでも重要なメソッドだ。さらに、他の多くのメソッドは <tt>foreach</tt> に基づいて実装されている。そのため、このメソッドの最適化に労力を割くことは論理的であると言える。<tt>IndexedSeq</tt>内の <tt>foreach</tt> の標準実装は、単に <tt>apply</tt> を用いてコレクションの全ての <tt>i</tt>番目の要素を選択する（このとき <tt>i</tt> は <tt>0</tt> からコレクションの長さ - 1 の範囲）。つまり、標準実装は配列要素を選択し、パック化解除して塩基にするという作業を
 RNA鎖にある全ての要素に対して行うことになる。<tt>RNA</tt> クラスのオーバーライドする <tt>foreach</tt> はもう少し賢い。全ての配列の要素に対して、選択後直ちに要素に含まれる全ての塩基に渡された関数を適用する。そのため、配列の選択とパック化解除のための労力がかなり軽減される。</p>
-<p>続いては、<a href="collections-impl_6.html">新しい集合やマップへの統合</a></p>
+<p>続いては、<a href="collections-impl_6.html">新しい集合やマップの参入</a></p>
 <hr />
 <table width="100%" cellpadding="0" cellspacing="2">
 <tr>
-<td bgcolor="#99CCFF"><a href="collections-impl_6.html"><img border="0" alt="新しい集合やマップへの統合" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_6.html"><img border="0" alt="新しい集合やマップの参入" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
 <td bgcolor="#99CCFF"><a href="collections-impl_4.html"><img border="0" alt="RNA メソッドの戻り値型の適応" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
 <td align="center" bgcolor="#99CCFF" width="100%"><b><tt>map</tt> 類の取り扱い</b></td>

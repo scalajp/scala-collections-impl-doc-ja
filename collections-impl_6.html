@@ -1,0 +1,552 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="generator" content="HTML Tidy for Mac OS X (vers 25 March 2009), see www.w3.org" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<title>Scala コレクションのアーキテクチャ -- 新しい集合やマップの参入</title>
+<link rel="stylesheet" type="text/css" href="guide.css" />
+</head>
+<body dir="ltr">
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_7.html"><img border="0" alt="まとめ" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_5.html"><img border="0" alt="map 類の取り扱い" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b>新しい集合やマップの参入</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+<h1>新しい集合やマップの参入</h1>
+<p>二つ目の具体例として新しい種類のマップをコレクションフレームワークに参入させる方法を見てみよう。概要としては、「パトリシアトライ (Patricia trie)」<sup><a href="collections-impl_9.html#id1">1</a></sup>のキーの型を <tt>String</tt> とした可変マップを実装したい。 <em>Patricia</em> は "Practical Algorithm to Retrieve Information Coded in Alphanumeric" （英数字で符号化された情報を検索するための実用的アルゴリズム）の頭文字をとった略だ。基本的な考え方としては、集合やマップを、検索キーの次の文字が一意的に子ノードを決定する木構造で格納するというものだ。例えば、"<tt>abc</tt>"、"<tt>abd</tt>"、"<tt>al</tt>"、"<tt>all</tt>"、"<tt>xy</tt>" の五つの文字列を格納するパトリシアトライは以下のようになる:</p>
+<p><a name="fig:patricia" id="fig:patricia">&nbsp;</a> <img alt="&lt;image not found&gt;" src="patricia.png" /></p>
+<div align="center">パトリシアトライの具体例</div>
+<p>このトライの中から文字列 "abc" に対応するノードを検索したければ、単に "<tt>a</tt>" とラベル付けされた子ノードに注目し、次に "<tt>b</tt>" の子ノードに移動し、最後に "<tt>c</tt>" とラベル付された子ノードに到着する。パトリシアトライがマップとして使われていたならば、キーに関連付けられた値は、キーによって得られるノードに格納される。もし集合ならば、このノードが集合に存在するというマーカを格納するだけでいい。</p>
+<p><a name="lst:prefixmap" id="lst:prefixmap">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">import</font>&nbsp;collection.</tt><tt>_</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">class</font>&nbsp;<font color="#660099">PrefixMap[T]</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">extends</font>&nbsp;<font color="#660099">mutable.</font></tt><tt><font color="#660099">Map[String, T]</font>&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;<font color="#0000E5">with</font>&nbsp;<font color="#660099">mutable.</font></tt><tt><font color="#660099">MapLike[String, T, PrefixMap[T]]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">var</font>&nbsp;suffixes:&nbsp;<font color="#660099">immutable.</font></tt><tt><font color="#660099">Map[Char, PrefixMap[T]]</font>&nbsp;=&nbsp;Map.empty</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">var</font>&nbsp;value:&nbsp;<font color="#660099">Option[T]</font>&nbsp;=&nbsp;<font color="#660099">None</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;get(s:&nbsp;<font color="#660099">String</font>):&nbsp;<font color="#660099">Option[T]</font>&nbsp;=</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">if</font>&nbsp;(s.isEmpty)&nbsp;value</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">else</font>&nbsp;suffixes&nbsp;get&nbsp;(s(<font color="#000000">0</font>))&nbsp;flatMap&nbsp;(_.get(s&nbsp;substring&nbsp;<font color="#000000">1</font>))</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;withPrefix(s:&nbsp;<font color="#660099">String</font>):&nbsp;<font color="#660099">PrefixMap[T]</font>&nbsp;=&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">if</font>&nbsp;(s.isEmpty)&nbsp;<font color="#0000E5">this</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;} else {</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;leading&nbsp;=&nbsp;s(<font color="#000000">0</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;suffixes&nbsp;get&nbsp;leading&nbsp;<font color="#0000E5">match</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">case</font>&nbsp;<font color="#660099">None</font>&nbsp;=&gt;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;suffixes&nbsp;=&nbsp;suffixes&nbsp;+&nbsp;(leading&nbsp;-&gt;&nbsp;empty)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;suffixes(leading)&nbsp;withPrefix&nbsp;(s&nbsp;substring&nbsp;<font color="#000000">1</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">override</font>&nbsp;<font color="#0000E5">def</font>&nbsp;update(s:&nbsp;<font color="#660099">String</font>,&nbsp;elem:&nbsp;T)&nbsp;=</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;withPrefix(s).value&nbsp;=&nbsp;<font color="#660099">Some</font>(elem)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">override</font>&nbsp;<font color="#0000E5">def</font>&nbsp;remove(s:&nbsp;<font color="#660099">String</font>):&nbsp;<font color="#660099">Option[T]</font>&nbsp;=</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">if</font>&nbsp;(s.isEmpty)&nbsp;{&nbsp;<font color="#0000E5">val</font>&nbsp;prev&nbsp;=&nbsp;value;&nbsp;value&nbsp;=&nbsp;<font color="#660099">None</font>;&nbsp;prev&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">else</font>&nbsp;suffixes&nbsp;get&nbsp;(s(<font color="#000000">0</font>))&nbsp;flatMap&nbsp;(_.remove(s&nbsp;substring&nbsp;<font color="#000000">1</font>))</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;iterator:&nbsp;<font color="#660099">Iterator[(String, T)]</font>&nbsp;=</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;(<font color="#0000E5">for</font>&nbsp;(v&nbsp;&lt;-&nbsp;value.iterator)&nbsp;<font color="#0000E5">yield</font>&nbsp;(<font color="#000000">""</font>,&nbsp;v))&nbsp;++</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;(<font color="#0000E5">for</font>&nbsp;((chr,&nbsp;m)&nbsp;&lt;-&nbsp;suffixes.iterator;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(s,&nbsp;v)&nbsp;&lt;-&nbsp;m.iterator)&nbsp;<font color="#0000E5">yield</font>&nbsp;(chr&nbsp;+:&nbsp;s,&nbsp;v))</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;+=&nbsp;(kv:&nbsp;(<font color="#660099">String</font>,&nbsp;T)):&nbsp;<font color="#0000E5">this</font>.type&nbsp;=&nbsp;{&nbsp;update(kv._1,&nbsp;kv._2);&nbsp;<font color="#0000E5">this</font>&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;-=&nbsp;(s:&nbsp;<font color="#660099">String</font>):&nbsp;<font color="#0000E5">this</font>.type&nbsp;&nbsp;=&nbsp;{&nbsp;remove(s);&nbsp;<font color="#0000E5">this</font>&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">override</font>&nbsp;<font color="#0000E5">def</font>&nbsp;empty&nbsp;=&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">PrefixMap[T]</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center">パトリシアトライを用いたプレフィックスマップの実装</div>
+<p>パトリシアトライは非常に効率的な検索と更新をサポートする。もう一つの便利な機能はプレフィックス (prefix) による部分コレクションの選択をサポートすることだ。例えば<a href="collections-impl_6.html#fig:patricia">上記のパトリシアトライ</a>では、木のルートから "<tt>a</tt>" のリンクをたどることでキーが "<tt>a</tt>" から始まる部分コレクションを取得することができる。</p>
+<p>このような考え方に基づき、パトリシアトライとして実装されるマップの実装を見てみよう。このマップは、任意のプレフィックスから始まる全てのキーの部分マップを返す <tt>withPrefix</tt> メソッドを提供するため、 <tt>PrefixMap</tt> と呼ぶことにする。以下のキー具体例でプレフィックスマップを定義してみよう:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#0000E5">val</font>&nbsp;m&nbsp;=&nbsp;<font color="#660099">PrefixMap</font>(<font color="#000000">"abc"</font>&nbsp;-&gt;&nbsp;<font color="#000000">0</font>,&nbsp;<font color="#000000">"abd"</font>&nbsp;-&gt;&nbsp;<font color="#000000">1</font>,&nbsp;<font color="#000000">"al"</font>&nbsp;-&gt;&nbsp;<font color="#000000">2</font>,&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#000000">"all"</font>&nbsp;-&gt;&nbsp;<font color="#000000">3</font>,&nbsp;<font color="#000000">"xy"</font>&nbsp;-&gt;&nbsp;<font color="#000000">4</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">m:&nbsp;PrefixMap[Int]&nbsp;=&nbsp;Map((abc,0),&nbsp;(abd,1),&nbsp;(al,2),&nbsp;(all,3),</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">&nbsp;&nbsp;(xy,4))</font></tt></td>
+</tr>
+</table>
+</div>
+<p><tt>m</tt> に対して <tt>withPrefix</tt> を呼び出すと別のプレフィックスマップが返ってくる:
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;m&nbsp;withPrefix&nbsp;<font color="#000000">"a"</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res14:&nbsp;PrefixMap[Int]&nbsp;=&nbsp;Map((bc,0),&nbsp;(bd,1),&nbsp;(l,2),&nbsp;(ll,3))</font></tt></td>
+</tr>
+</table>
+</div>
+<p><a href="collections-impl_6.html#lst:prefixmap">前述のコード</a>は <tt>PrefixMap</tt> の定義を示す。 このクラスは関連付けされる値の型 <tt>T</tt> においてパラメータ化され、<tt>mutable.Map[String, T]</tt> と <tt>mutable.MapLike[String, T, PrefixMap[T]]</tt> を継承する。このパターンは RNA鎖で見たとおり、<tt>MapLike</tt> のような実装トレイトを継承することで <tt>filter</tt> のような変換で正しい戻り値型を得ることができる。</p>
+<p>プレフィックスマップのノードには、<tt>suffixes</tt> と <tt>value</tt> の二つの可変フィールドがある。<tt>value</tt> はノードに関連付けられた値があれば、それを含み、<tt>None</tt> に初期化される。<tt>suffixes</tt> フィールドには文字から <tt>PrefixMap</tt> 値へのマップを含み、空のマップに初期化される。</p>
+<p><tt>suffixes</tt> の実装型としてなぜ不変マップを選んだのかと疑問に思うかもしれない。<tt>PrefixMap</tt> そのものが可変であるため、可変マップにした方が標準的ではないだろうか。答は、不変マップが少ない数の要素しか含まない場合にそのメモリ空間と実行時間の両方において非常に効率的だというものがある。例えば、5個未満の要素を含むマップは単一のオブジェクトとして表現される。それに対して、標準の可変マップである <tt>HashMap</tt> は、空であっても普通約 80 バイトのメモリを占める。そのため、小さいコレクションが一般的な場合は、可変よりも不変マップを選んだほうがいいのだ。パトリシアトライの場合は、最上位のノード以外のほとんどのノードが数個の子ノードしか持たないだろうことが予想される。そのため、子ノードを不変マップとして格納するほうが効率的なのだ。</p>
+<p>ここでマップの実装に必要な最初のメソッド <tt>get</tt> を見てみる。 以下のようなアルゴリズムで動作する。空文字に関連付けられた値をプレフィックスマップから取得するには、木のルートノードの <tt>value</tt> のオプション値を選択する。キーの文字列が空でない場合、文字列の先頭の文字に対応する部分マップを選択する。それがマップを返せば、キー文字列の先頭以外の残りについても同様に検索を進める。もし選択に失敗した場合は、キーはマップに格納されていないため <tt>None</tt> を返す。オプション値の選択の組み合わせは <tt>flatMap</tt> によって簡潔に表現されている。オプション値 <tt>ov</tt> と、オプション値を返すクロージャ <tt>f</tt> に適用された場合、<tt>ov</tt>&nbsp;<tt>flatMap</tt>&nbsp;<tt>f</tt> は <tt>ov</tt> と <tt>f</tt>
+の両方が定義値を返す場合のみ成功する。それ以外の場合、<tt>ov</tt>&nbsp;<tt>flatMap</tt>&nbsp;<tt>f</tt> は <tt>None</tt> を返す。</p>
+<p>可変マップの実装に必要な次の二つのメソッドは <tt>+=</tt> と <tt>-=</tt> だ。<a href="collections-impl_6.html#lst:prefixmap">PrefixMap</a> の実装では、これらは <tt>update</tt> と <tt>remove</tt> という二つのメソッドに基づいて定義されている。</p>
+<p><tt>remove</tt> メソッドは、関連付けられた値を返す前にその値に <tt>None</tt> がセットされる以外は、<tt>get</tt> に非常に似ている。<tt>update</tt> メソッドは、まず <tt>withPrefix</tt> を呼び出して更新すべきノードを探し出し、<tt>value</tt> フィールドを渡された値にセットする。<tt>withPrefix</tt> メソッドは、木構造の中に無いプレフィックス文字があれば部分マップを作成しながら探索を進める。</p>
+<p>可変マップの実装に必要な最後の抽象メソッドは <tt>iterator</tt> だ。 <a name="id3" id="id3"></a><a name="id3" id="id3">この</a>メソッドはマップ内の全てのキー/値ペアを返すイテレータを作成する必要がある。どのプレフィックスマップに対しても、イテレータは以下のパーツから構成される。第一に、マップのルートノードの <tt>value</tt> フィールドに定義値 <tt>Some(x)</tt> を含む場合は、イテレータが最初に返す要素は <tt>("",</tt>&nbsp;<tt>x)</tt> だ。さらに、イテレータは、<tt>suffixes</tt> フィールドに格納される全ての部分マップのイテレータも探索しなければいけないが、それらのイテレータが返すキー文字列の先頭に一文字追加する必要がある。より正確に言うと、ルートノードから <tt>chr</tt> を用いて到達した部分マップを <tt>m</tt> として、<tt>m.iterator</tt> が返す要素が
+<tt>(s,</tt>&nbsp;<tt>v)</tt> だと仮定すると、ルートノードのイテレータは <tt>(chr</tt>&nbsp;<tt>+:</tt>&nbsp;<tt>s,</tt>&nbsp;<tt>v)</tt> を代わりに返す。<a href="collections-impl_6.html#lst:prefixmap">PrefixMap クラス</a>の <tt>iterator</tt> メソッドの実装では、二つの <tt>for</tt> 式を連結することでこのロジックは簡潔に実装されている。最初の <tt>for</tt> 式は <tt>value.iterator</tt> を周回する。これは、<tt>Option</tt> が、オプション値が <tt>None</tt> であれば要素を返さず、オプション値が <tt>Some(x)</tt> であれば単一の要素 <tt>x</tt> を返すイテレータメソッドを定義していることを利用している。</p>
+<p><a name="id4" id="id4">&nbsp;</a></p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>import scala.collection.mutable.{</tt><tt><font color="#660099">Builder</font>,&nbsp;<font color="#660099">MapBuilder</font>}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">import</font>&nbsp;scala.collection.generic.</tt><tt>CanBuildFrom</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#0000E5">object</font>&nbsp;<font color="#660099">PrefixMap</font>&nbsp;<font color="#0000E5">extends</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;empty[T]&nbsp;=&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">PrefixMap[T]</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply[T](kvs:&nbsp;(<font color="#660099">String</font>,&nbsp;T)*):&nbsp;<font color="#660099">PrefixMap[T]</font>&nbsp;=&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">val</font>&nbsp;m:&nbsp;<font color="#660099">PrefixMap[T]</font>&nbsp;=&nbsp;empty</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">for</font>&nbsp;(kv&nbsp;&lt;-&nbsp;kvs)&nbsp;m&nbsp;+=&nbsp;kv</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;m</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;newBuilder[T]:&nbsp;<font color="#660099">Builder[(String, T), PrefixMap[T]]</font>&nbsp;=&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">MapBuilder[String, T, PrefixMap[T]]</font>(empty)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;<font color="#0000E5">implicit</font>&nbsp;<font color="#0000E5">def</font>&nbsp;canBuildFrom[T]</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;:&nbsp;<font color="#660099">CanBuildFrom[PrefixMap[_], (String, T), PrefixMap[T]]</font>&nbsp;=&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">new</font>&nbsp;<font color="#660099">CanBuildFrom[PrefixMap[_], (String, T), PrefixMap[T]]</font>&nbsp;{</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply(from:&nbsp;<font color="#660099">PrefixMap[_]</font>)&nbsp;=&nbsp;newBuilder[T]</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<font color="#0000E5">def</font>&nbsp;apply()&nbsp;=&nbsp;newBuilder[T]</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>}</tt></td>
+</tr>
+</table>
+</div>
+<div align="center">プレフィックスマップのコンパニオンオブジェクト</div>
+<p><tt>PrefixMap</tt> に <tt>newBuilder</tt> メソッドが無いことに注意してほしい。これはマップと集合には <tt>MapBuilder</tt> クラスのインスタンスがデフォルトのビルダとして付いてくるため、その必要がないためだ。可変マップのデフォルトビルダは空のマップから始まり、後続の要素をマップの <tt>+=</tt> を用いて追加していく。可変集合も同様に振る舞う。不変マップと不変集合のデフォルトビルダは、<tt>+=</tt> の代わりに非破壊的な加算メソッドである <tt>+</tt> を用いる。</p>
+<p>しかし、どちらの場合においても、正しい種類の集合やマップを構築するには適切な種類の空の集合やマップが必要となる。これは、<a href="collections-impl_6.html#lst:prefixmap">PrefixMap クラス</a> で最後に定義されるメソッドである <tt>empty</tt> メソッドによって提供される。このメソッドは単に新しい <tt>PrefixMap</tt> を返す。</p>
+<p>次に、<a href="collections-impl_6.html#id4">コンパニオンオブジェクト <tt>PrefixMap</tt></a> に注目する。実は、<tt>PrefixMap</tt> クラスは単体でも十分やっていけるのでコンパニオンオブジェクトの定義は正確には必要ない。<tt>PrefixMap</tt> オブジェクトの主な目的は便宜のためにファクトリメソッドをいくつか定義することにある。また、暗黙の値 <tt>CanBuildFrom</tt> を定義することで型付けが向上する。</p>
+<p>便宜のためのメソッドとしてはは、<tt>empty</tt> と <tt>apply</tt> の二つがある。 Scala コレクションフレームワークの全てのコレクションにおいて同じメソッドがあるので、ここでも定義しておくのが妥当だろう。この二つをメソッドを用いて、<tt>PrefixMap</tt> を他のコレクションと同じ記法で表記できる:</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;<font color="#660099">PrefixMap</font>(<font color="#000000">"hello"</font>&nbsp;-&gt;&nbsp;<font color="#000000">5</font>,&nbsp;<font color="#000000">"hi"</font>&nbsp;-&gt;&nbsp;<font color="#000000">2</font>)</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res0:&nbsp;PrefixMap[Int]&nbsp;=&nbsp;Map((hello,5),&nbsp;(hi,2))</font></tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>&nbsp;&nbsp;</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;PrefixMap.empty[<font color="#660099">String</font>]</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res2:&nbsp;PrefixMap[String]&nbsp;=&nbsp;Map()</font></tt></td>
+</tr>
+</table>
+</div>
+<p><tt>PrefixMap</tt> オブジェクトのもう一つのメンバは暗黙の値 <tt>CanBuildFrom</tt> のインスタンスだ。これは、<tt>map</tt> のようなメソッドが最適な型を返すという前のセクションで見た <tt>CanBuildFrom</tt> の定義と同じ目的を持つ。例えば、<tt>PrefixMap</tt> のキー/値ペアについて関数を <tt>map</tt> すると仮定する。その関数が文字列と何らかの型のペアを返す限り、戻り値のコレクションは再び <tt>PrefixMap</tt> である。次に具体例で説明する。</p>
+<div class="quote">
+<table cellspacing="1" cellpadding="0">
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt>scala&gt;&nbsp;res0&nbsp;map&nbsp;{&nbsp;<font color="#0000E5">case</font>&nbsp;(k,&nbsp;v)&nbsp;=&gt;&nbsp;(k&nbsp;+&nbsp;<font color="#000000">"!"</font>,&nbsp;<font color="#000000">"x"</font>&nbsp;*&nbsp;v)&nbsp;}</tt></td>
+</tr>
+<tr>
+<td></td>
+</tr>
+<tr>
+<td colspan="99" align="left"><tt><font color="#590000">res8:&nbsp;PrefixMap[String]&nbsp;=&nbsp;Map((hello!,xxxxx),&nbsp;(hi!,xx))</font></tt></td>
+</tr>
+</table>
+</div>
+<p>渡された関数の引数は、プレフィックスマップ <tt>res0</tt> のキー/値のペアを取り、文字列のペアを返す。<tt>map</tt> の戻り値は、値の型として <tt>Int</tt> の代わりに <tt>String</tt> を持つ <tt>PrefixMap</tt> だ。<tt>PrefixMap</tt> に暗黙の値 <tt>canBuildFrom</tt> が無ければ、この戻り値はプレフィックスマップではなく一般可変マップになっていただろう。</p>
+<p>続いては、<a href="collections-impl_7.html">まとめ</a></p>
+<hr />
+<table width="100%" cellpadding="0" cellspacing="2">
+<tr>
+<td bgcolor="#99CCFF"><a href="collections-impl_7.html"><img border="0" alt="まとめ" src="http://lampwww.epfl.ch/~odersky/images/next.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_0.html"><img border="0" alt="トップ" src="http://lampwww.epfl.ch/~odersky/images/up.png" /></a></td>
+<td bgcolor="#99CCFF"><a href="collections-impl_5.html"><img border="0" alt="map 類の取り扱い" src="http://lampwww.epfl.ch/~odersky/images/previous.png" /></a></td>
+<td align="center" bgcolor="#99CCFF" width="100%"><b>新しい集合やマップの参入</b></td>
+<td bgcolor="#99CCFF" align="center"><a href="collections-impl_8.html">目次</a></td>
+</tr>
+</table>
+</body>
+</html>
