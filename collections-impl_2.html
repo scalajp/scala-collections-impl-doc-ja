@@ -97,7 +97,7 @@
 </div>
 <div align="center"><tt>TraversableLike</tt> における <tt>filter</tt> の実装</div>
 <p>コレクションライブラリ再設計の主な設計目標は自然な型と実装コード共有の最大化を同時に実現することだった。特に、Scala のコレクションは「戻り値同型」の原則 ("same-result-type" principle) を採用しており、コレクションの変換メソッドは、できる限り同じ型のコレクションを返すようにしている。例えば、<tt>filter</tt> 演算は全てのコレクション型において、同じコレクション型のインスタンスを返すべきだ。<tt>List</tt> に <tt>filter</tt> を適用すれば <tt>List</tt> を返すし、<tt>Map</tt> は <tt>Map</tt> を返す、という具合だ。これから、これがどう実現されているのかを見てみようと思う。</p>
-<p>Scala コレクションライブラリは、いわゆる<em>実装トレイト</em> (implementation trait) を用いてジェネリックなビルダとコレクションの探索を実装することで、コードの重複と「戻り値同型」原則を実現している。<a name="id1" id="id1">これら</a>のトレイトは語尾に <tt>Like</tt> が付くように命名されており、例えば、 <tt>IndexedSeqLike</tt> は <tt>IndexedSeq</tt> の実装トレイトであり、同様に <tt>TraversableLike</tt> は <tt>Traversable</tt> の実装トレイトだ。<tt>Traversable</tt> や <tt>IndexedSeq</tt> のような<a name="id3" id="id3">コレクション</a>クラスはこれらのトレイトから全ての具象メソッド (concrete method)
+<p>Scala コレクションライブラリは、いわゆる<em>実装トレイト</em> (implementation trait) を用いてジェネリックなビルダとコレクションの探索を実装することで、「戻り値同型」の原則を実現しながらもコードの重複を避けている。<a name="id1" id="id1">これら</a>のトレイトは語尾に <tt>Like</tt> が付くように命名されており、例えば、 <tt>IndexedSeqLike</tt> は <tt>IndexedSeq</tt> の実装トレイトであり、同様に <tt>TraversableLike</tt> は <tt>Traversable</tt> の実装トレイトだ。<tt>Traversable</tt> や <tt>IndexedSeq</tt> のような<a name="id3" id="id3">コレクション</a>クラスはこれらのトレイトから全ての具象メソッド (concrete method)
 の実装を継承している。普通のコレクションには一つの型パラメータがあるが、実装トレイトには二つの型パラメータがある。実装トレイトはコレクションの要素型についてパラメータ化するだけではなく、コレクションの<em>表現型</em> (representation type)、つまり <tt>Seq[I]</tt> や <tt>List[T]</tt> のような実際のコレクションの型そのものをパラメータ化する。例えば、ここに <tt>TraversableLike</tt> トレイトのヘッダを示す:</p>
 <div class="quote">
 <table cellspacing="1" cellpadding="0">
