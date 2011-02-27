@@ -113,7 +113,7 @@
 <p><tt>filter</tt> を例にとると、この演算は <tt>TraversableLike</tt> トレイト内で一度だけ全てのコレクションに対して実装されている。大まかなコードの概要は上記の <a href="collections-impl_2.html"><tt>TraversableLike</tt> クラスの概要</a>にて示されている。このトレイトは、後に具象コレクションクラスで実装される <tt>newBuilder</tt> と <tt>foreach</tt> という二つの抽象メソッドを宣言する。<tt>filter</tt> 演算は、これらのメソッドを使って全てのコレクションに対して同様に実装されている。まず、<tt>newBuilder</tt> を用いて表現型 <tt>Repr</tt> の新しいビルダが構築される。次に、<tt>foreach</tt> を用いて現コレクション内の全ての要素が探索される。要素 <tt>x</tt> が与えられた条件関数 <tt>p</tt> を満たせば（つまり、<tt>p(x)</tt> が
 <tt>true</tt> を返せば）、その要素はビルダに追加される。最後に、ビルダの <tt>result</tt> メソッドを呼び出すことで、ビルダの中に収集された要素は <tt>Repr</tt> コレクション型のインスタンスとして返される。</p>
 <p>コレクションの <tt>map</tt> 演算はもう少し複雑だ。 例えば、<tt>f</tt> が <tt>String</tt> から <tt>Int</tt> への関数で、<tt>xs</tt> が <tt>List[String]</tt> だとすると、<tt>xs</tt>&nbsp;<tt>map</tt>&nbsp;<tt>f</tt> は <tt>List[Int]</tt> を返さなくてはならない。同様に、<tt>ys</tt> が <tt>Array[String]</tt> ならば、<tt>ys</tt>&nbsp;<tt>map</tt>&nbsp;<tt>f</tt> は <tt>Array[Int]</tt> を返さなくてはならない。問題は、<tt>map</tt> メソッドの定義をリストと配列で重複させずに、どうこれを実現させるかということだ。<a href="collections-impl_2.html"><tt>TraversableLike</tt> クラスの例</a>で見た
-<tt>newBuilder</tt>/<tt>foreach</tt> フレームワークは、コレクションと同じ<em>型</em>の新しいインスタンスしか生成できないため不十分だ。<tt>map</tt> は、<em>型コンストラクタ</em> (type constructor) は同じでもでも、要素型が異なりうるコレクションの新しいインスタンスが必要になるからだ。</p>
+<tt>newBuilder</tt>/<tt>foreach</tt> フレームワークは、コレクションと同じ<em>型</em>の新しいインスタンスしか生成できないため不十分だ。<tt>map</tt> は、<em>型コンストラクタ</em> (type constructor) は同じでも、要素型が異なりうるコレクションの新しいインスタンスが必要になるからだ。</p>
 <p>さらに、<tt>map</tt> のような関数の戻り値は、型コンストラクタさえも自明でない形で他の引数の型に依存する可能性がある。以下に具体例で説明する:</p>
 <div class="quote">
 <table cellspacing="1" cellpadding="0">
